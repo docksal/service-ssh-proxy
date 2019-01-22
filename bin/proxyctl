@@ -1,0 +1,300 @@
+#!/usr/bin/env bash
+
+### Configuration variables ###
+
+SSHPIPERD_UPSTREAM_WORKINGDIR=${SSHPIPERD_UPSTREAM_WORKINGDIR:-"/var/sshpiper"}
+
+# Make directory if doesn't exist.
+if [[ ! -d "${SSHPIPERD_UPSTREAM_WORKINGDIR}" ]]; then
+	mkdir -p ${SSHPIPERD_UPSTREAM_WORKINGDIR}
+fi
+
+### Helper functions ###
+
+### Functions ###
+
+# (Re)connect proxy to project networks.
+# Useful when proxy has been just re-provisioned and should be re-connected to existing project networks.
+networks ()
+{
+	# Filter: primary containers with a defined virtual host
+	project_names=$(docker ps \
+		--filter "label=io.docksal.project-root" \
+		--filter "label=io.docksal.virtual-host" \
+		--format '{{.Label "com.docker.compose.project"}}')
+
+	while read project_name; do
+		local network="${project_name}_default"
+		# Making sure the network exists
+		docker network create "$network" >/dev/null 2>&1
+		# Reconnect vhost-proxy to the project network (in case vhost-proxy has been recently reset)
+		docker network connect "$network" docksal-ssh-proxy >/dev/null 2>&1
+		if [[ $? == 0 ]]; then
+			log "Connected proxy to network: ${network}."
+      log "Adding to ssh proxy: ${network}."
+      connect $project_name >/dev/null 2>&1
+		fi
+	done <<< "$project_names"
+}
+
+## Remove all projects that are no longer available.
+cleanup ()
+{
+  log "Removing all non-existant projects"
+
+  while read project_name; do
+    if [[ ! -d ${SSHPIPERD_UPSTREAM_WORKINGDIR}/${project_name} ]]; then
+      continue
+    fi
+
+    # Get Container Name for CLI
+    cli_name=$(docker ps -a \
+      --filter "label=com.docker.compose.project=${project_name}" \
+      --filter "label=com.docker.compose.service=cli" \
+      --format '{{.Names}}');
+
+    # If not found remove from the system.
+    if [[ -z "${cli_name}" ]]; then
+      remove $project_name;
+    fi
+	done <<< $(ls -1 ${SSHPIPERD_UPSTREAM_WORKINGDIR})
+}
+
+# Rebuild the key directory.
+rebuild ()
+{
+  log "Rebuilding all projects"
+  cleanup
+  networks
+}
+
+# Build the Project Name and add the SSH Key
+# @param $1 - Project Directory
+connect ()
+{
+  project_name=$1
+  log "Connecting ${project_name} to ssh proxy"
+
+  # If project_name is empty exit
+  if [[ -z $project_name ]]; then
+    log "Project name is empty"
+    return 0
+  fi
+
+  # Get Container Name for CLI
+  cli_name=$(docker ps \
+    --filter "label=com.docker.compose.project=${project_name}" \
+    --filter "label=com.docker.compose.service=cli" \
+    --format '{{.Names}}');
+
+  # If cli_name returns empty exit
+  if [[ -z $cli_name ]]; then
+    log "CLI name empty or not found in project ${project_name}"
+    return 0
+  fi
+
+  # Create project_directory if doesn't exist.
+  project_dir="${SSHPIPERD_UPSTREAM_WORKINGDIR}/${project_name}"
+  if [[ ! -d "${project_dir}" ]]; then
+    mkdir $project_dir 2>&1
+  fi
+
+  key_file=${project_dir}/id_rsa
+  if [[ ! -f "${key_file}" ]]; then
+    ssh-keygen -t rsa -b 4096 -N '' -f "${key_file}" 2>&1
+  fi
+
+  upstream_file="${project_dir}/sshpiper_upstream"
+  if [[ ! -f "${upstream_file}" ]]; then
+    touch "${upstream_file}"
+  fi
+
+  echo "docker@${cli_name}" > "${upstream_file}" 2>&1
+  chmod 400 "${upstream_file}"
+
+  authorized_keys_file=${project_dir}/authorized_keys
+  if [[ ! -f "${authorized_keys_file}" ]]; then
+    touch "${authorized_keys_file}"
+    touch "${authorized_keys_file}_project"
+  fi
+
+  # Set permissions of key file.
+  chmod 400 ${key_file} >/dev/null 2>&1
+
+  # Automatically add ssh key to container
+  sshpass -e ssh-copy-id -i ${key_file} docker@${cli_name} 2>&1
+}
+
+# Add project to ssh proxy.
+# @param $1 - Project Directory
+add ()
+{
+  local project_name=$1
+
+  # If project_name is empty don't continue.
+  if [[ -z "${project_name}" ]]; then
+    return 0
+  fi
+
+  # If project_directory doesn't exist exit.
+  project_directory="${SSHPIPERD_UPSTREAM_WORKINGDIR}/${project_name}"
+  if [[ ! -d "${project_directory}" ]]; then
+    return 0
+  fi
+
+  log "Adding ${project_name} to ssh proxy"
+  connect ${project_name}
+}
+
+# Remove project from everything
+# @param $1 - Project Directory
+remove ()
+{
+  local project_name=$1
+  log "Removing ${project_name} from ssh proxy"
+
+  # If project_name is empty exit.
+  if [[ -z "${project_name}" ]]; then
+    return 0
+  fi
+
+  # If project_directory doesn't exist exit.
+  project_directory=${SSHPIPERD_UPSTREAM_WORKINGDIR}/${project_name}
+  if [[ ! -d ${project_directory} ]]; then
+    return 0
+  fi
+
+  # Remove project_directory from list.
+  rm -rf "${project_directory}" 2>&1
+}
+
+# Run through all projects and add them if they don't exist.
+cron ()
+{
+  log "Running Cron"
+
+  # Filter: primary containers with a defined virtual host
+	project_names=$(docker ps \
+		--filter "label=io.docksal.project-root" \
+		--filter "label=io.docksal.virtual-host" \
+		--format '{{.Label "com.docker.compose.project"}}')
+
+	while read project_name; do
+    add $project_name
+	done <<< "$project_names"
+  log "Done Running Cron"
+}
+
+# Add a Key to the Project
+# @param $1 - Project Directory
+# @param $2 - SSH Key
+add_key ()
+{
+  project_name=$1
+  key=$2
+
+  # If project_name is empty exit.
+  if [[ -z "${project_name}" ]] || [[ -z "${key}" ]]; then
+    return 0
+  fi
+
+  # Add Project To SSH Proxy
+  add $project_name
+
+  # If project_directory doesn't exist exit.
+  project_directory=${SSHPIPERD_UPSTREAM_WORKINGDIR}/${project_name}
+  if [[ ! -d ${project_directory} ]]; then
+    return 0
+  fi
+
+  # Store all project level keys in authorized_keys_project file.
+  keys_file=${project_directory}/authorized_keys_project
+  echo "${key}" >> $keys_file
+
+  # Rebuild Keys for project.
+  rebuild_project_keys $project_name
+
+  log "Added key to ${project_name}"
+}
+
+# Add Key to Authorized Keys File. Used for global.
+# @param $1 - SSH Public Key
+add_global_key ()
+{
+  key=$1
+  echo "${key}" >> /authorized_keys
+
+  rebuild_all_keys
+}
+
+# Rebuild keys for a project
+# @param $1 - Project Directory
+rebuild_project_keys ()
+{
+  project_name=$1
+
+  # If project_name is empty exit.
+  if [[ -z "${project_name}" ]]; then
+    return 0
+  fi
+
+  project_directory=${SSHPIPERD_UPSTREAM_WORKINGDIR}/${project_name}
+  if [[ ! -d ${project_directory} ]]; then
+    return 0
+  fi
+
+  # Store all project level keys in authorized_keys_project file.
+  keys_file=${project_directory}/authorized_keys_project
+
+  # Add both Global Keys and Project Keys into the authorized_keys file
+  keys_file_all=${project_directory}/authorized_keys
+
+  cat /authorized_keys ${keys_file} > ${keys_file_all}
+  chmod 400 ${keys_file_all}
+}
+
+# Loop through projects and rebuild the keys.
+rebuild_all_keys ()
+{
+  while read project_name; do
+    rebuild_project_keys $project_name
+	done <<< $(ls -1 ${SSHPIPERD_UPSTREAM_WORKINGDIR})
+}
+
+# Helper for writing log messages
+# @param $@ Log message
+log ()
+{
+	echo "$(date +"%F %H:%M:%S") [proxyctl] ${LOG_PREFIX} $@"
+}
+
+#-------------------------- RUNTIME STARTS HERE ----------------------------
+
+# Parse other parameters
+case "$1" in
+	networks)
+		networks
+		;;
+	cleanup)
+		cleanup
+		;;
+  cron)
+    cron
+    ;;
+  add)
+    shift
+    add "$1"
+    ;;
+  rebuild)
+    rebuild
+    ;;
+  add_key)
+    shift
+    add_key "$1" "$2"
+    ;;
+  remove)
+    remove "$2"
+    ;;
+	*)
+		echo "Usage: $0 networks|cleanup|add|remove"
+esac

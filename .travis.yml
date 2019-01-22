@@ -1,0 +1,27 @@
+dist: xenial
+
+language: minimal
+
+env:
+  DOCKSAL_VERSION: develop
+  PROJECTS_ROOT: ${TRAVIS_BUILD_DIR}/projects
+
+install:
+  # Install Docksal to have a matching versions of Docker on the build host
+  - curl -fsSL https://get.docksal.io | bash
+  - fin version
+  - fin sysinfo
+
+before_script:
+  - fin pl -a
+
+script:
+  - make
+  - make start
+  - make test
+
+after_success:
+  - make release
+
+after_failure:
+  - make logs
