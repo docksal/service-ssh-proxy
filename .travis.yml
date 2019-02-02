@@ -1,4 +1,6 @@
-language: generic
+dist: xenial
+
+language: minimal
 
 services:
   - docker
@@ -11,6 +13,9 @@ before_install:
   - sudo apt-get install libfcgi0ldbl  # cgi-fcgi binary used in tests
 
 install:
+  - git clone https://github.com/docksal/bats.git tests/scripts/bats
+  - cd tests/scripts/bats
+  - sudo ./install.sh /usr/local
   # Install Docksal to have a matching versions of Docker on the build host
   - curl -fsSL https://get.docksal.io | bash
   - fin version
