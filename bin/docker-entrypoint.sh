@@ -8,9 +8,8 @@ set -e # Abort if anything fails
 # Service mode
 if [[ "$1" == "supervisord" ]]; then
 	# Generate config files from templates
-
 	exec supervisord -c /etc/supervisord.conf
-# Command mode
 else
+	# Command mode
 	exec "$@"
 fi

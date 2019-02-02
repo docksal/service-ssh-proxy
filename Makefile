@@ -4,8 +4,9 @@ VERSION ?= dev
 
 REPO = docksal/ssh-proxy
 NAME = docksal-ssh-proxy
-DOCKER ?= fin docker
+DOCKER ?= docker
 DOCKER_HOST ?= 0.0.0.0
+VOLUME ?= docksal_projects_ssh
 
 .EXPORT_ALL_VARIABLES:
 
@@ -29,15 +30,20 @@ exec-it:
 shell:
 	@$(DOCKER) exec -it ${NAME} sh
 
-start:
+start-volume:
+	$(DOCKER) volume create --name $(VOLUME)
+
+start-container:
 	$(DOCKER) run -d \
 		--name=$(NAME) \
 		--label "io.docksal.group=system" \
 		--restart=always \
 		-p "$(DOCKER_HOST):2222":2222 \
-		--mount type=volume,src=docksal_ssh_agent,dst=/.ssh-agent,readonly \
+		--mount type=volume,src=${VOLUME},dst=/ssh-proxy \
 		--mount type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock \
 		${REPO}:${VERSION}
+
+start: start-volume start-container
 
 start-stopped:
 	$(DOCKER) start $(NAME)
@@ -58,11 +64,18 @@ debug: build start logs-follow
 release:
 	@scripts/release.sh
 
-clean:
-	$(DOCKER) rm -vf ${NAME} || true
+remove-volume:
+	$(DOCKER) volume rm ${VOLUME} || true
 
-remake: stop clean build
+remove-container:
+	$(DOCKER) rm -f ${NAME} || true
+
+clean: remove-container remove-volume
+
+remake: stop remove-container build
 
 remake-start: remake start
+
+rebuild: stop clean build start
 
 default: build

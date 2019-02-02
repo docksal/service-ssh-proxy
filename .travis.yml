@@ -4,7 +4,6 @@ language: minimal
 
 env:
   DOCKSAL_VERSION: develop
-  PROJECTS_ROOT: ${TRAVIS_BUILD_DIR}/projects
 
 install:
   # Install Docksal to have a matching versions of Docker on the build host
@@ -13,11 +12,17 @@ install:
   - fin sysinfo
 
 before_script:
+  - git clone https://github.com/docksal/drupal8.git ../drupal8
+  - cd ../drupal8
+  - fin start
+  - git clone https://github.com/docksal/drupal7.git ../drupal7
+  - cd ../drupal7
+  - fin start
   - fin pl -a
+  - cd ${TRAVIS_BUILD_DIR}
 
 script:
   - make
-  - make start
   - make test
 
 after_success:

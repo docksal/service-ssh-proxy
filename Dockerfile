@@ -30,22 +30,31 @@ COPY conf/supervisord.conf /etc/supervisord.conf
 COPY conf/crontab /var/spool/cron/crontabs/root
 COPY bin /usr/local/bin
 COPY healthcheck.sh /opt/healthcheck.sh
-COPY conf/sshpiperd.ini /etc/sshpiperd.ini
+COPY conf/sshpiperd.ini.template /etc/sshpiperd.ini.template
 COPY banner.txt /banner.txt
 COPY authorized_keys /authorized_keys
+COPY conf/ssh_config /etc/ssh/ssh_config
 
 # Fix permissions
 RUN chmod 0440 /etc/sudoers
 
+# Environment Variables
 ENV \
-  SSHPIPERD_UPSTREAM_WORKINGDIR=/var/sshpiper \
-	SSHPASS=docker
+	SSH_PROXY_SERVERKEY=/etc/ssh/ssh_host_rsa_key \
+	SSH_PROXY_LOGLEVEL=3 \
+	SSH_PROXY_UPSTREAM_WORKINGDIR=/ssh-proxy \
+	SSH_PROXY_UPSTREAM_ALLOWBADUSERNAME="false" \
+	SSH_PROXY_UPSTREAM_NOCHECKPERM="false" \
+	SSH_PROXY_UPSTREAM_FALLBACKUSERNAME="" \
+	SSH_PROXY_UPSTREAM_STRICTHOSTKEY="false" \
+	SSHPASS=docker \
+	SSH_USER=docker
 
 # Generate SSH Key
 RUN ssh-keygen \
   -t rsa \
 	-b 4096 \
-  -f /etc/ssh/ssh_host_rsa_key \
+  -f ${SSH_PROXY_SERVERKEY} \
   -N ""
 
 # Starter script

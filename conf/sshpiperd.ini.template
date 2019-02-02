@@ -1,0 +1,18 @@
+[sshpiperd]
+listen = 0.0.0.0
+port = 2222
+server-key = ${SSH_PROXY_SERVERKEY}
+upstream-driver = workingdir
+challenger-driver =
+auditor-driver =
+banner-text =
+banner-file = /banner.txt
+log =
+log-flags = ${SSH_PROXY_LOGLEVEL}
+
+[upstream.workingdir]
+upstream-workingdir = ${SSH_PROXY_UPSTREAM_WORKINGDIR}
+upstream-workingdir-allowbadusername = ${SSH_PROXY_UPSTREAM_ALLOWBADUSERNAME}
+upstream-workingdir-nocheckperm = ${SSH_PROXY_UPSTREAM_NOCHECKPERM}
+upstream-workingdir-fallbackusername = ${SSH_PROXY_UPSTREAM_FALLBACKUSERNAME}
+upstream-workingdir-stricthostkey = ${SSH_PROXY_UPSTREAM_STRICTHOSTKEY}
