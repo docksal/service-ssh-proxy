@@ -1,12 +1,14 @@
-dist: xenial
+language: generic
 
 services:
   - docker
 
-language: minimal
-
 env:
   DOCKSAL_VERSION: develop
+
+before_install:
+  - sudo apt-get -qq update
+  - sudo apt-get install libfcgi0ldbl  # cgi-fcgi binary used in tests
 
 install:
   # Install Docksal to have a matching versions of Docker on the build host
