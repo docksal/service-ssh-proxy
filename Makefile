@@ -5,7 +5,7 @@ VERSION ?= dev
 REPO = docksal/ssh-proxy
 NAME = docksal-ssh-proxy
 DOCKER ?= docker
-DOCKER_HOST ?= 0.0.0.0
+DOCKER_HOST_IP ?= 0.0.0.0
 VOLUME ?= docksal_projects_ssh
 
 .EXPORT_ALL_VARIABLES:
@@ -38,7 +38,7 @@ start-container:
 		--name=$(NAME) \
 		--label "io.docksal.group=system" \
 		--restart=always \
-		-p "$(DOCKER_HOST):2222":2222 \
+		-p "$(DOCKER_HOST_IP):2222":2222 \
 		--mount type=volume,src=${VOLUME},dst=/ssh-proxy \
 		--mount type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock \
 		${REPO}:${VERSION}
