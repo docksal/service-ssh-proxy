@@ -9,6 +9,7 @@ env:
   DOCKSAL_VERSION: develop
 
 before_install:
+  - cp conf/ssh_config $HOME/.ssh/config
   - sudo apt-get -qq update
   - sudo apt-get install libfcgi0ldbl  # cgi-fcgi binary used in tests
 
