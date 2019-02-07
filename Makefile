@@ -16,7 +16,7 @@ build:
 	$(DOCKER) build -t ${REPO}:${VERSION} .
 
 test:
-	IMAGE=${REPO}:${VERSION} bats tests/test.bats
+	NAME=${NAME} IMAGE=${REPO}:${VERSION} bats tests/test.bats
 
 push:
 	$(DOCKER) push ${REPO}:${VERSION}
