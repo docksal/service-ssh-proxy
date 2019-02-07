@@ -134,7 +134,7 @@ _healthcheck_wait ()
 	docker exec ${NAME} proxyctl add-key drupal8 "${KEY}" test-key
 
 	### Tests ###
-	run docker exec ${NAME} proxyctl list drupal8 test-key
+	run docker exec ${NAME} proxyctl list-keys
 	[[ "${output}" =~ "test-key: ${KEY}" ]]
 	unset output
 }
