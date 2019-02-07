@@ -9,6 +9,7 @@ setup () {
 teardown() {
 	docker network disconnect drupal8_default docksal-ssh-proxy
 	make clean
+	rm -rf $HOME/.ssh/test_rsa || true
 
 	echo "Status: $status"
 	echo "Output:"
