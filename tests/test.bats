@@ -78,7 +78,7 @@ _healthcheck_wait ()
 	ssh-keygen -t rsa -b 4096 -N "" -f $HOME/.ssh/test_rsa
 	KEY=$(cat $HOME/.ssh/test_rsa.pub)
 	run docker exec ${NAME} proxyctl add-key drupal8 "${KEY}"
-	[[ "${output}" =~ "Creating /ssh-proxy/project/drupal8/keys/" ]]
+	[[ "${output}" =~ "Creating /ssh-proxy/projects/drupal8/keys/" ]]
 	[[ "${output}" =~ "Added key to" ]]
 	unset output
 }
@@ -92,7 +92,7 @@ _healthcheck_wait ()
 
 	### Tests ###
 	run docker exec ${NAME} proxyctl add-key drupal8 "${KEY}" test-key
-	[[ "${output}" =~ "Creating /ssh-proxy/project/drupal8/keys/test-key" ]]
+	[[ "${output}" =~ "Creating /ssh-proxy/projects/drupal8/keys/test-key" ]]
 	[[ "${output}" =~ "Added key to drupal8" ]]
 	unset output
 }
