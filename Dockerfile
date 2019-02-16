@@ -32,7 +32,6 @@ COPY bin /usr/local/bin
 COPY healthcheck.sh /opt/healthcheck.sh
 COPY conf/sshpiperd.ini.template /etc/sshpiperd.ini.template
 COPY banner.txt /banner.txt
-COPY authorized_keys /authorized_keys
 COPY conf/ssh_config /etc/ssh/ssh_config
 
 # Fix permissions
@@ -42,13 +41,14 @@ RUN chmod 0440 /etc/sudoers
 ENV \
 	SSH_PROXY_SERVERKEY=/etc/ssh/ssh_host_rsa_key \
 	SSH_PROXY_LOGLEVEL=3 \
-	SSH_PROXY_UPSTREAM_WORKINGDIR=/ssh-proxy \
+	SSH_PROXY_UPSTREAM_WORKINGDIR=/ssh-proxy/projects \
 	SSH_PROXY_UPSTREAM_ALLOWBADUSERNAME="false" \
 	SSH_PROXY_UPSTREAM_NOCHECKPERM="false" \
 	SSH_PROXY_UPSTREAM_FALLBACKUSERNAME="" \
 	SSH_PROXY_UPSTREAM_STRICTHOSTKEY="false" \
 	SSHPASS=docker \
-	SSH_USER=docker
+	SSH_USER=docker \
+	SSH_PROXY_GLOBAL_KEYS=/ssh-proxy/global-keys
 
 # Generate SSH Key
 RUN ssh-keygen \

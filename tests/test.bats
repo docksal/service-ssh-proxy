@@ -176,3 +176,17 @@ _healthcheck_wait ()
 	[[ "${output}" =~ "Permission denied (publickey,password)" ]]
 	unset output
 }
+
+@test "Connecting to drupal7 with Global Key" {
+	[[ $SKIP == 1 ]] && skip
+
+	# Generate ssh-key
+	ssh-keygen -t rsa -b 4096 -N "" -f $HOME/.ssh/test_rsa
+	KEY=$(cat $HOME/.ssh/test_rsa.pub)
+	docker exec ${NAME} proxyctl add-global-key "${KEY}" test-key
+
+	### Tests ###
+	run ssh -oBatchMode=yes -i $HOME/.ssh/test_rsa -p 2222 drupal7@drupal7.docksal 'hostname'
+	[[ "${output}" =~ "cli" ]]
+	unset output
+}

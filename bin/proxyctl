@@ -1,5 +1,26 @@
 #!/usr/bin/env bash
 
+if [[ "$TERM" != "dumb" ]]; then
+	# Console colors
+	red='\033[0;91m'
+	red_bg='\033[101m'
+	yellow_bg='\033[43;90m'
+	green='\033[0;32m'
+	green_bg='\033[42m'
+	yellow='\033[0;33m'
+	yellow_bold='\033[1;33m'
+	blue='\033[0;34m'
+	lime='\033[0;92m'
+	acqua='\033[0;96m'
+	magenta='\033[0;35m'
+	NC='\033[0m'
+fi
+
+# Make global direcotry if doesn't exist.
+if [[ ! -d "${SSH_PROXY_GLOBAL_KEYS}" ]]; then
+	mkdir -p ${SSH_PROXY_GLOBAL_KEYS}
+fi
+
 # Make directory if doesn't exist.
 if [[ ! -d "${SSH_PROXY_UPSTREAM_WORKINGDIR}" ]]; then
 	mkdir -p ${SSH_PROXY_UPSTREAM_WORKINGDIR}
@@ -34,7 +55,7 @@ networks ()
 ## Remove all projects that are no longer available.
 cleanup ()
 {
-	log "Removing all non-existant projects"
+	log "Removing all non-existent projects"
 
 	while read project_name; do
 		if [[ ! -d ${SSH_PROXY_UPSTREAM_WORKINGDIR}/${project_name} ]]; then
@@ -114,7 +135,6 @@ connect ()
 	authorized_keys_file=${project_dir}/authorized_keys
 	if [[ ! -f "${authorized_keys_file}" ]]; then
 		touch "${authorized_keys_file}"
-		touch "${authorized_keys_file}_project"
 	fi
 
 	# Set permissions of key file.
@@ -290,11 +310,45 @@ list_keys ()
 
 # Add Key to Authorized Keys File. Used for global.
 # @param $1 - SSH Public Key
+# @param $2 - Key Name
 add_global_key ()
 {
-	key=$1
-	echo "${key}" >> /authorized_keys
+	local key=$1
+	local key_name=${2:-"global-${RANDOM}"}
+	local key_file="${SSH_PROXY_GLOBAL_KEYS}/${key_name}"
+	if [[ ! -f "${key_file}" ]]; then
+		echo "${key}" > ${key_file}
+		log "Added key to Globals"
+
+		log "Rebuilding all keys"
+		rebuild_all_keys
+	fi
+}
+
+# Remove a Key from a Project
+# @param $1 - Key Name
+remove_global_key ()
+{
+	key_name=$1
+
+	keys_file=${SSH_PROXY_GLOBAL_KEYS}/${key_name}
+	rm -f $keys_file || true
+	log "Removed key ${key_name} from global."
+
+	# Rebuild all SSH Keys Authorized
+	log "Rebuilding all keys"
 	rebuild_all_keys
+}
+
+# List Global Keys For Project
+list_global_keys ()
+{
+	while read key; do
+		if [[ -n "${key}" ]]; then
+			key_value=$(cat "${SSH_PROXY_GLOBAL_KEYS}/${key}");
+			echo "${key}: ${key_value}"
+		fi
+	done <<< $(ls -1 ${SSH_PROXY_GLOBAL_KEYS})
 }
 
 # Rebuild keys for a project
@@ -318,12 +372,24 @@ rebuild_project_keys ()
 	# Add both Global Keys and Project Keys into the authorized_keys file
 	keys_file_all=${project_directory}/authorized_keys
 
-	cat /authorized_keys > ${keys_file_all}
+	# Reset the Keys File.
+	echo "" > ${keys_file_all}
+
+	# Loop through all global keys and add to the authorized keys.
+	while read key; do
+		if [[ -n "${key}" ]]; then
+			cat "${SSH_PROXY_GLOBAL_KEYS}/${key}" >> ${keys_file_all}
+		fi
+	done <<< $(ls -1 ${SSH_PROXY_GLOBAL_KEYS})
+
+	# Loop through all project keys and add the authorized keys.
 	while read key; do
 		if [[ -n "${key}" ]]; then
 			cat "${project_directory}/keys/${key}" >> ${keys_file_all}
 		fi
 	done <<< $(ls -1 ${project_directory}/keys)
+
+	# Set Permissions of the Authorized Keys
 	chmod 400 ${keys_file_all}
 }
 
@@ -355,6 +421,61 @@ rebuild_config ()
 	sed -i "s|\${SSH_PROXY_UPSTREAM_NOCHECKPERM}|${SSH_PROXY_UPSTREAM_NOCHECKPERM}|g" ${config_file}
 	sed -i "s|\${SSH_PROXY_UPSTREAM_FALLBACKUSERNAME}|${SSH_PROXY_UPSTREAM_FALLBACKUSERNAME}|g" ${config_file}
 	sed -i "s|\${SSH_PROXY_UPSTREAM_STRICTHOSTKEY}|${SSH_PROXY_UPSTREAM_STRICTHOSTKEY}|g" ${config_file}
+}
+
+printh ()
+{
+	local COMMAND_COLUMN_WIDTH=${4:-45};
+	case "$3" in
+		yellow)
+			printf "  ${yellow}%-${COMMAND_COLUMN_WIDTH}s${NC}" "$1"
+			echo -e "	$2"
+			;;
+		green)
+			printf "  ${green}%-${COMMAND_COLUMN_WIDTH}s${NC}" "$1"
+			echo -e "	$2"
+			;;
+		*)
+			printf "  %-${COMMAND_COLUMN_WIDTH}s" "$1"
+			echo -e "	$2"
+			;;
+	esac
+
+}
+
+# Usage command
+usage ()
+{
+	local script=$(basename $0)
+	echo "Control Docksal SSH Proxy"
+	echo
+	printh "${script} [command]"
+	echo
+	echo "Commands:"
+	printh "restart" "Restart Proxy Service Internally"
+	printh "rebuild-config" "Rebuild Configuration from variables"
+	printh "networks" "Add proxy to all available project networks"
+	printh "cleanup" "Delete all keys and project configuration"
+	printh "cron" "Run cron and connect ssh proxy to each available network"
+	printh "rebuild" "Delete all projects reconnect all active projects"
+	echo
+	printh "add-global-key [key] <key_name>" "Add a key to the global list"
+	printh "remove-global-key [key-name]" "Remove a specific key from the global list"
+	printh "list-global-keys" "List all Global Keys"
+	echo
+	printh "add-project [project-name]" "Add a project "
+	printh "remove-project [project-name]" "Remove project from the proxy"
+	printh "list-projects" "List all projects currently installed on proxy"
+	echo
+	printh "add-key [project-name] [key] <key_name>" "Add a key for a project"
+	printh "remove-key [project-name] [key_name]" "Remove a specific key"
+	printh "list-keys [project-name]" "List all the keys installed for a project"
+	echo
+	echo "Examples:"
+	printh "${script} add-key testproject \"ssh-rsa ....\" test-key" "Add key to testproject Project" "normal" 65
+	printh "${script} remove testproject test-key" "Remove test-key key from testproject Project" "normal" 65
+	printh "${script} networks" "Network all running containers to the proxy" "normal" 65
+	echo
 }
 
 #-------------------------- RUNTIME STARTS HERE ----------------------------
@@ -402,6 +523,18 @@ case "$1" in
 		shift
 		list_keys "$1"
 		;;
+	add-global-key)
+		shift
+		add_global_key "$1" "$2"
+		;;
+	remove-global-key)
+		shift
+		remove_global_key "$1" "$2"
+		;;
+	list-global-keys)
+		list_global_keys
+		;;
 	*)
-		echo "Usage: $0 restart|rebuild-config|networks|cleanup|cron|add-project|remove-project|list-projects|rebuild|add-key|remove-key|list-keys"
+		usage
+		;;
 esac
