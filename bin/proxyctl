@@ -46,9 +46,8 @@ networks ()
 		docker network connect "$network" docksal-ssh-proxy >/dev/null 2>&1
 		if [[ $? == 0 ]]; then
 			log "Connected proxy to network: ${network}."
-			log "Adding to ssh proxy: ${network}."
-			connect $project_name >/dev/null 2>&1
 		fi
+		connect $project_name >/dev/null 2>&1
 	done <<< "$project_names"
 }
 
@@ -201,17 +200,10 @@ list_projects ()
 cron ()
 {
 	log "Running Cron"
-
-	# Filter: primary containers with a defined virtual host
-	project_names=$(docker ps \
-		--filter "label=io.docksal.project-root" \
-		--filter "label=io.docksal.virtual-host" \
-		--format '{{.Label "com.docker.compose.project"}}')
-
-	while read project_name; do
-		add_project $project_name
-	done <<< "$project_names"
+	networks
+	cleanup
 	log "Done Running Cron"
+	exit 0
 }
 
 # Add a Key to the Project
