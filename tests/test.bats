@@ -1,22 +1,11 @@
 #!/usr/bin/env bats
 
-setup () {
-	make start
-	_healthcheck_wait
-}
-
 # Debugging
-teardown() {
-	docker network disconnect drupal8_default docksal-ssh-proxy
-	make clean
-	rm -rf $HOME/.ssh/test_rsa || true
-
-	echo "Status: $status"
+teardown () {
+	echo
 	echo "Output:"
 	echo "================================================================"
-	for line in "${lines[@]}"; do
-		echo $line
-	done
+	echo "${output}"
 	echo "================================================================"
 }
 
@@ -25,14 +14,14 @@ teardown() {
 _healthcheck ()
 {
 	local health_status
-	health_status=$(docker inspect --format='{{json .State.Health.Status}}' "$1" 2>/dev/null)
+	health_status=$(${DOCKER} inspect --format='{{json .State.Health.Status}}' "$1" 2>/dev/null)
 
 	# Wait for 5s then exit with 0 if a container does not have a health status property
 	# Necessary for backward compatibility with images that do not support health checks
 	if [[ $? != 0 ]]; then
-	echo "Waiting 10s for container to start..."
-	sleep 10
-	return 0
+		echo "Waiting 10s for container to start..."
+		sleep 10
+		return 0
 	fi
 
 	# If it does, check the status
@@ -43,8 +32,8 @@ _healthcheck ()
 _healthcheck_wait ()
 {
 	# Wait for cli to become ready by watching its health status
-	local container_name="${NAME}"
-	local delay=5
+	local container_name="${1}"
+	local delay=1
 	local timeout=30
 	local elapsed=0
 
@@ -55,8 +44,8 @@ _healthcheck_wait ()
 		# Give the container 30s to become ready
 		elapsed=$((elapsed + delay))
 		if ((elapsed > timeout)); then
-				echo "$container_name heathcheck failed"
-				exit 1
+			echo "$container_name heathcheck failed"
+			exit 1
 		fi
 	done
 
@@ -64,6 +53,12 @@ _healthcheck_wait ()
 }
 
 @test "${NAME} container is up and using the \"${IMAGE}\" image" {
+	### Setup ###
+	make start
+
+	run _healthcheck_wait
+	unset output
+
 	[[ ${SKIP} == 1 ]] && skip
 
 	run docker ps --filter "name=${NAME}" --format "{{ .Image }}"
@@ -75,7 +70,7 @@ _healthcheck_wait ()
 	[[ $SKIP == 1 ]] && skip
 
 	# Generate ssh-key
-	ssh-keygen -t rsa -b 4096 -N "" -f $HOME/.ssh/test_rsa
+	yes y | ssh-keygen -t rsa -b 4096 -N "" -f $HOME/.ssh/test_rsa
 	KEY=$(cat $HOME/.ssh/test_rsa.pub)
 	run docker exec ${NAME} proxyctl add-key drupal8 "${KEY}"
 	[[ "${output}" =~ "Creating /ssh-proxy/projects/drupal8/keys/" ]]
@@ -87,7 +82,7 @@ _healthcheck_wait ()
 	[[ $SKIP == 1 ]] && skip
 
 	# Generate ssh-key
-	ssh-keygen -t rsa -b 4096 -N "" -f $HOME/.ssh/test_rsa
+	yes y | ssh-keygen -t rsa -b 4096 -N "" -f $HOME/.ssh/test_rsa
 	KEY=$(cat $HOME/.ssh/test_rsa.pub)
 
 	### Tests ###
@@ -101,7 +96,7 @@ _healthcheck_wait ()
 	[[ $SKIP == 1 ]] && skip
 
 	# Generate ssh-key
-	ssh-keygen -t rsa -b 4096 -N "" -f $HOME/.ssh/test_rsa
+	yes y | ssh-keygen -t rsa -b 4096 -N "" -f $HOME/.ssh/test_rsa
 	KEY=$(cat $HOME/.ssh/test_rsa.pub)
 	docker exec ${NAME} proxyctl add-key drupal8 "${KEY}"
 
@@ -115,7 +110,7 @@ _healthcheck_wait ()
 	[[ $SKIP == 1 ]] && skip
 
 	# Generate ssh-key
-	ssh-keygen -t rsa -b 4096 -N "" -f $HOME/.ssh/test_rsa
+	yes y | ssh-keygen -t rsa -b 4096 -N "" -f $HOME/.ssh/test_rsa
 	KEY=$(cat $HOME/.ssh/test_rsa.pub)
 	docker exec ${NAME} proxyctl add-key drupal8 "${KEY}" test-key
 
@@ -129,7 +124,7 @@ _healthcheck_wait ()
 	[[ $SKIP == 1 ]] && skip
 
 	# Generate ssh-key
-	ssh-keygen -t rsa -b 4096 -N "" -f $HOME/.ssh/test_rsa
+	yes y | ssh-keygen -t rsa -b 4096 -N "" -f $HOME/.ssh/test_rsa
 	KEY=$(cat $HOME/.ssh/test_rsa.pub)
 	docker exec ${NAME} proxyctl add-key drupal8 "${KEY}" test-key
 
@@ -153,7 +148,7 @@ _healthcheck_wait ()
 	[[ $SKIP == 1 ]] && skip
 
 	# Generate ssh-key
-	ssh-keygen -t rsa -b 4096 -N "" -f $HOME/.ssh/test_rsa
+	yes y | ssh-keygen -t rsa -b 4096 -N "" -f $HOME/.ssh/test_rsa
 	KEY=$(cat $HOME/.ssh/test_rsa.pub)
 	docker exec ${NAME} proxyctl add-key drupal8 "${KEY}" test-key
 
@@ -167,7 +162,7 @@ _healthcheck_wait ()
 	[[ $SKIP == 1 ]] && skip
 
 	# Generate ssh-key
-	ssh-keygen -t rsa -b 4096 -N "" -f $HOME/.ssh/test_rsa
+	yes y | ssh-keygen -t rsa -b 4096 -N "" -f $HOME/.ssh/test_rsa
 	KEY=$(cat $HOME/.ssh/test_rsa.pub)
 	docker exec ${NAME} proxyctl add-key drupal8 "${KEY}" test-key
 
@@ -181,7 +176,7 @@ _healthcheck_wait ()
 	[[ $SKIP == 1 ]] && skip
 
 	# Generate ssh-key
-	ssh-keygen -t rsa -b 4096 -N "" -f $HOME/.ssh/test_rsa
+	yes y | ssh-keygen -t rsa -b 4096 -N "" -f $HOME/.ssh/test_rsa
 	KEY=$(cat $HOME/.ssh/test_rsa.pub)
 	docker exec ${NAME} proxyctl add-global-key "${KEY}" test-key
 
