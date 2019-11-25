@@ -1,6 +1,7 @@
 -include env_make
 
 VERSION ?= dev
+BUILD_TAG ?= $(VERSION)
 
 REPO = docksal/ssh-proxy
 NAME = docksal-ssh-proxy
@@ -13,13 +14,13 @@ VOLUME ?= docksal_projects_ssh
 .PHONY: build exec test push shell run start stop logs debug clean release
 
 build:
-	$(DOCKER) build -t ${REPO}:${VERSION} .
+	$(DOCKER) build -t ${REPO}:${BUILD_TAG} .
 
 test:
-	NAME=${NAME} IMAGE=${REPO}:${VERSION} bats tests/test.bats
+	NAME=${NAME} IMAGE=${REPO}:${BUILD_TAG} bats tests/test.bats
 
 push:
-	$(DOCKER) push ${REPO}:${VERSION}
+	$(DOCKER) push ${REPO}:${BUILD_TAG}
 
 exec:
 	@$(DOCKER) exec ${NAME} ${CMD}
@@ -41,7 +42,7 @@ start-container:
 		-p "$(DOCKER_HOST_IP):2222":2222 \
 		--mount type=volume,src=${VOLUME},dst=/ssh-proxy \
 		--mount type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock \
-		${REPO}:${VERSION}
+		${REPO}:${BUILD_TAG}
 
 start: start-volume start-container
 
@@ -62,7 +63,7 @@ logs-follow:
 debug: build start logs-follow
 
 release:
-	@scripts/release.sh
+	@scripts/docker-push.sh
 
 remove-volume:
 	$(DOCKER) volume rm ${VOLUME} || true
