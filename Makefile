@@ -1,6 +1,10 @@
 -include env_make
 
-VERSION ?= dev
+ifeq ($(VERSION),)
+    VERSION = dev
+    LATEST_VERSION = $(VERSION)
+endif
+
 BUILD_TAG ?= $(VERSION)
 
 REPO = docksal/ssh-proxy
